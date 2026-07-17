@@ -1,0 +1,12 @@
+# This is a generated file and its contents are an internal implementation detail.
+# The download step will be re-executed if anything in this file changes.
+# No other meaning or use of this file is supported.
+
+method=url
+command=/Applications/CMake.app/Contents/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/CMakeFiles/fc-stamp/googletest/download-googletest.cmake;COMMAND;/Applications/CMake.app/Contents/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/CMakeFiles/fc-stamp/googletest/verify-googletest.cmake;COMMAND;/Applications/CMake.app/Contents/bin/cmake;-DCMAKE_MESSAGE_LOG_LEVEL=VERBOSE;-P;/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/CMakeFiles/fc-stamp/googletest/extract-googletest.cmake
+source_dir=/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/_deps/googletest-src
+work_dir=/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/_deps
+url(s)=https://github.com/google/googletest/archive/refs/tags/v1.15.2.zip
+hash=
+      no_extract=
+

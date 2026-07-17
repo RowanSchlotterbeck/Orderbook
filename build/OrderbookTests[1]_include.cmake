@@ -1,0 +1,5 @@
+if(EXISTS "/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/OrderbookTests[1]_tests.cmake")
+  include("/Users/rowanschlotterbeck/CLionProjects/Orderbook/build/OrderbookTests[1]_tests.cmake")
+else()
+  add_test(OrderbookTests_NOT_BUILT OrderbookTests_NOT_BUILT)
+endif()
