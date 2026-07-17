@@ -9,6 +9,7 @@ A limit order book matching engine written in modern C++23. Implements price-tim
 - Multi-level sweep matching for aggressive orders
 - Partial fills on both incoming and resting sides
 - 18 unit tests covering matching semantics and cancellation edge cases
+- Google Benchmark suite measuring per-operation latency and throughput (inserts, matches, cancels, multi-level sweeps, mixed workload)
 - Zero-dependency build via CMake with FetchContent
 
 
@@ -50,14 +51,16 @@ book.printBook();
 
 ```
 Orderbook/
-├── CMakeLists.txt          # Build config; fetches GoogleTest for the test target
+├── CMakeLists.txt          # Build config; fetches GoogleTest + Google Benchmark
 ├── src/
 │   ├── order.h             # Order/Price/Quantity/OrderId/Side primitives
 │   ├── orderbook.h         # Orderbook class interface
 │   ├── orderbook.cpp       # Matching engine + book maintenance
 │   └── main.cpp            # Entry point
-└── tests/
-    └── orderbook_tests.cpp # 18 GoogleTest unit tests
+├── tests/
+│   └── orderbook_tests.cpp # 18 GoogleTest unit tests
+└── bench/
+    └── orderbook_bench.cpp # Google Benchmark throughput/latency suite
 ```
 
 ## Building and running
@@ -73,6 +76,11 @@ cmake --build build --target Orderbook
 # Build and run the test suite
 cmake --build build --target OrderbookTests
 ./build/OrderbookTests
+
+# Build and run the benchmark suite (use a Release configure for meaningful numbers)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target OrderbookBenchmarks
+./build/OrderbookBenchmarks
 ```
 
 ## Test coverage
@@ -87,6 +95,28 @@ The test suite exercises the matching engine through its observable behavior (st
 - **Book ordering** — asks always print ascending, bids always print descending, regardless of insertion order
 
 Run `./build/OrderbookTests` for full output; all 18 tests pass.
+
+## Benchmarks
+
+Throughput and per-operation latency are measured with [Google Benchmark](https://github.com/google/benchmark), fetched automatically via CMake `FetchContent`. `matchIncoming()` logs every fill to `std::cout`, which is great for the CLI demo but would make any matching benchmark mostly measure console I/O syscall cost instead of the order book's actual data-structure work — so the benchmark harness (`bench/orderbook_bench.cpp`) redirects `std::cout` to a no-op sink for the run, without modifying `orderbook.cpp`/`orderbook.h` at all, and reports Google Benchmark's own results table on `stderr` instead. Every timed region also calls `benchmark::DoNotOptimize(book)` + `benchmark::ClobberMemory()` after the measured operation so `-O3` can't elide work whose result is never observed.
+
+Sample results (Apple Silicon, `-O3`, single-threaded; run `./build/OrderbookBenchmarks` to reproduce on your machine — absolute numbers are hardware-dependent, but the relative shape should hold):
+
+| Benchmark | Latency | Throughput |
+|---|---|---|
+| Resting insert (no match) | ~437 ns/op | ~4.6M orders/sec |
+| Immediate match (no book mutation) | ~125 ns/op | ~8.0M matches/sec |
+| Cancel order | ~43 ns/op | ~23M cancels/sec |
+| Sweep across 100,000 price levels | ~19.5 ms/sweep | ~51 sweeps/sec (100k levels/sweep) |
+| Mixed realistic workload (60% add / 30% cross / 10% cancel) | ~78 ns/op | ~12.8M msgs/sec |
+
+What each benchmark isolates:
+
+- **Resting insert** — orders that never cross, so every call takes the "insert into `std::map` + `std::list`, register in `unordered_map`" path. This is the O(log n) price-level lookup plus O(1) list/hash insert cost.
+- **Immediate match** — a single deep resting order absorbs every incoming order without ever being exhausted, isolating `matchIncoming()`'s comparison and quantity-bookkeeping cost from any insertion/removal cost.
+- **Cancel order** — isolates the O(1) `unordered_map` lookup + `std::list::erase` cost that the `orderLookup_` index exists to provide.
+- **Sweep across many price levels** — a book pre-seeded with 100,000 distinct resting price levels gets consumed by a single aggressive order that crosses all of them. Reported as sweeps/sec (one full 100k-level sweep is a single timed operation, since `Iterations(1)` forces exactly one sweep per repetition against a freshly-seeded book); the `levels_per_sweep` counter in the raw output makes the per-level cost recoverable.
+- **Mixed realistic workload** — a deterministically-seeded (fixed RNG seed) mix of passive adds, crossing adds (sized to fully deplete and cross into a second resting price level, exercising the list/map erase paths), and cancels against a book with standing liquidity, giving one representative "messages/sec" headline number closer to a live feed than any single micro-benchmark.
 
 ## Design notes / what's intentionally out of scope
 
